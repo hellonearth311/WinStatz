@@ -1,4 +1,6 @@
 from customtkinter import *
+from stats import update_stats
+from stats import get_specs
 
 
 def launch_ui():
