@@ -1,9 +1,4 @@
-from customtkinter import *
+from ui import launch_ui
 
-
-root = CTk()
-
-root.geometry("600x600")
-root.title("WinStatz")
-
-root.mainloop()
+if __name__ == "__main__":
+    launch_ui()
