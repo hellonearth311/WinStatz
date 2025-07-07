@@ -1,2 +1,2 @@
 # WinStatz
-A simple, minimalistic stats viewer for Winddows.
+A simple, minimalistic stats viewer for Windows.
