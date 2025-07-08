@@ -1,14 +1,136 @@
 import psutil
 import wmi
+import time
 
 # TODO
-# - add suport for multiple RAM sticks, multiple GPUs, and multiple disks
+# - add support for multiple RAM sticks, multiple GPUs, and multiple disks
+# - check all details in update_stats()
+# - add better error handling for individual hardware components in the get_specs() function
+# - check if i can make something in c or c++ that can get gpu usage for all gpu types
+# - make docstring code by typing
+# - make gui (make sure to use matplotlib for graphs n shit)
 
-def update_stats():
-    cpu_usage = psutil.cpu_percent()
-    ram_usage = psutil.virtual_memory().percent
+def get_usage():
+    '''
+    Get real-time usage data for most system components. \n
+    GPU Usage is **not** supported due to lack of a Python binding for AMD and Intel GPUs.\n
 
-    print(cpu_usage, ram_usage)
+    This function returns a list of 4 dictionaries and 1 list.\n
+    [cpu_usage (dict), ram_usage (dict), disk_usages (list of dicts), network_usage (dict), battery_usage (dict)] \n
+    
+    ### Below is an index of every element in every dictionary/list
+    #### cpu_usage
+    {\n
+    "core1": (usage),\n
+    "core2": (usage),\n
+    [Repeats for every core]\n
+    }
+    #### ram_usage,
+    {\n
+    "total": total ram,\n
+    "used": amount of ram used,\n
+    "free": amount of ram that is free,\n
+    "percent": percentage utilization of memory\n
+    }
+    #### disk_usages
+    [\n
+    {\n
+    "device": ex: C:// (pretend they are backslashes), \n
+    "mountpoint": same as above, \n
+    "fstype": file system. eg. NTFS, APFS, \n
+    "total": total amount in GB, \n
+    "used": amount used in GB, \n
+    "free": amount unused in GB, \n
+    "percentUsed": amount used as a percentage \n
+    }\n
+    (this repeats for every disk/partition)
+    ]
+    #### network_usage
+    {\n
+    "up": upload speed in mbps,\n
+    "down": download speed in mbps,\n
+    }
+    #### battery_usage
+    {\n
+    "percent": percent left,\n
+    "pluggedIn": is the battery plugged in,\n
+    "timeLeftMins": time left in minutes, if it returns 2147483640 that means unlimited,\n
+    }
+    '''
+    # cpu usage
+    cpu_usage_list = psutil.cpu_percent(percpu=True)
+
+    cpu_usage = {}
+    i = 1
+    for core in cpu_usage_list:
+        cpu_usage[f"core{i}"] = core
+        i += 1
+
+    print("cpu_usage")
+    print(cpu_usage)
+
+    # ram usage
+    ram = psutil.virtual_memory()
+
+    ram_usage = {
+        "total": round(ram.total / (1024 ** 2), 1),
+        "used": round(ram.used / (1024 ** 2), 1),
+        "free": round(ram.available / (1024 ** 2), 1),
+        "percent": ram.percent
+    }
+
+    print("ram usage")
+    print(ram_usage)
+
+    # disk usage
+    disk_usages = []
+
+    partitions = psutil.disk_partitions(all=False)
+    for part in partitions:
+        try:
+            usage = psutil.disk_usage(part.mountpoint)
+            disk_usages.append({
+                "device": part.device,
+                "mountpoint": part.mountpoint,
+                "fstype": part.fstype,
+                "total": round(usage.total / (1024 ** 3), 2),
+                "used": round(usage.used / (1024 ** 3), 2),
+                "free": round(usage.free / (1024 ** 3), 2),
+                "percentUsed": usage.percent
+            })
+        except PermissionError:
+            pass
+    
+    print("disk usages")
+    for disk in disk_usages:
+        print(disk)
+
+    # network usage
+    net1 = psutil.net_io_counters()
+    time.sleep(1)
+    net2 = psutil.net_io_counters()
+
+    upload_speed = (net2.bytes_sent - net1.bytes_sent) / 125
+    download_speed = (net2.bytes_recv - net1.bytes_recv) / 125
+
+    network_usage = {
+        "up": upload_speed,
+        "down": download_speed
+    }
+
+    print("network usage")
+    print(network_usage)
+
+    # battery stats
+    battery = psutil.sensors_battery()
+    battery_usage = {
+        "percent": battery.percent,
+        "pluggedIn": battery.power_plugged,
+        "timeLeftMins": battery.secsleft // 60 if battery.secsleft != psutil.POWER_TIME_UNLIMITED else 2147483640
+    }
+
+    print("battery usage")
+    print(battery_usage)
 
 def get_specs():
     '''
@@ -180,6 +302,7 @@ def get_specs():
         return [None, None, None, None, None, None]
 
 if __name__ == "__main__":
-    update_stats()
     get_specs()
+    print("------------------------------------------------------------------------------------------------")
+    get_usage()
 
