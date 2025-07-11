@@ -177,3 +177,4 @@ def open_3_dots_details():
 
     battery_label = CTkLabel(three_dots_details, text=battery_text, font=("Poppins", 12))
     battery_label.place(relx=0.85, rely=0.73, anchor="center")
+
