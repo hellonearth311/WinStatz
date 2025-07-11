@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 selected_disk_idx = 0
+window_bg = "#242424"
 
 def on_closing(root):
     if messagebox.askokcancel("Quit", "Do you want to quit?"):
@@ -34,20 +35,45 @@ def update_usage_labels(cpuLabel, ramLabel, diskLabel, networkLabel):
 
     threading.Thread(target=fetch_and_update, daemon=True).start()
 
+fig = None
+axs = None
+battery_fig = None
+battery_ax = None
+canvas = None
+battery_canvas = None
+
+def update_graph_theme(bg_color, text_color="white"):
+    global fig, axs, battery_fig, battery_ax, canvas, battery_canvas
+    # other graphs color
+    if fig is not None:
+        fig.patch.set_facecolor(bg_color)
+        for i, ax in enumerate(axs.flat):
+            ax.set_facecolor(bg_color)
+            ax.tick_params(colors=text_color)
+            ax.yaxis.label.set_color(text_color)
+            ax.xaxis.label.set_color(text_color)
+            if i == 2:
+                ax.set_title(ax.get_title(), color=text_color)
+            else:
+                ax.title.set_color(text_color)
+        if canvas is not None:
+            canvas.draw()
+    # battery color
+    if battery_fig is not None:
+        battery_fig.patch.set_facecolor(bg_color)
+        if battery_ax is not None:
+            battery_ax.set_facecolor(bg_color)
+            for text in battery_ax.texts:
+                text.set_color(text_color)
+        if battery_canvas is not None:
+            battery_canvas.draw()
+
 def build_main_ui():
     root = CTk()
-    root.geometry("1100x1100")
+    root.geometry("1000x1000")
     root.title("WinStatz")
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
-
-    # app design
-    # title at top
-    # cpu graph, ram graph
-    # disk graph, network graph
-    # battery icon on top right, hover over to reveal more info
-    # settings button in top left
-    # settings menu - color theme, dark/light mode
-
+    root.resizable(False, False)
 
     # title label
     titleLabel = CTkLabel(root, text="WinStatz", font=("Poppins", 48, "bold"))
@@ -63,7 +89,9 @@ def build_main_ui():
 
     # style
     plt.style.use('dark_background')
+    global fig, axs
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    fig.patch.set_facecolor(window_bg)
     plt.tight_layout(pad=6.0)
 
     # create the graphs
@@ -73,7 +101,7 @@ def build_main_ui():
     axs[1,1].set_title("Network Usage (Mbps)", color='white')
 
     for ax in axs.flat:
-        ax.set_facecolor('#222222')
+        ax.set_facecolor(window_bg)
         ax.tick_params(colors='white')
         ax.yaxis.label.set_color('white')
         ax.xaxis.label.set_color('white')
@@ -84,8 +112,10 @@ def build_main_ui():
     net_bar = axs[1,1].bar(["Up", "Down"], [0,0], color=["#e74c3c", "#1abc9c"])
 
     import matplotlib.patches as mpatches
+    global battery_fig, battery_ax
     battery_fig, battery_ax = plt.subplots(figsize=(4, 2))
-    battery_ax.set_facecolor('#222222')
+    battery_fig.patch.set_facecolor(window_bg)
+    battery_ax.set_facecolor(window_bg)
     battery_ax.axis('off')
     battery_icon = mpatches.FancyBboxPatch((0.2, 0.4), 0.6, 0.2,
         boxstyle="round,pad=0.05", ec="black", fc="#27ae60", mutation_aspect=2)
@@ -97,10 +127,11 @@ def build_main_ui():
     battery_ax.set_ylim(0, 1)
     battery_ax.text(0.5, 0.5, "Battery", color='white', fontsize=14, ha='center', va='center')
 
+    global canvas, battery_canvas
     canvas = FigureCanvasTkAgg(fig, master=root)
-    canvas.get_tk_widget().place(relx=0.5, rely=0.45, anchor="center")
+    canvas.get_tk_widget().place(relx=0.5, rely=0.5, anchor="center")
     battery_canvas = FigureCanvasTkAgg(battery_fig, master=root)
-    battery_canvas.get_tk_widget().place(relx=0.5, rely=0.85, anchor="center")
+    battery_canvas.get_tk_widget().place(relx=0.5, rely=0.95, anchor="center")
 
     # update the bar graphs
     def update_bars_threaded():
@@ -122,7 +153,7 @@ def build_main_ui():
 
                 # Disk
                 disk_title = f"Disk {selected_disk_idx + 1} Usage (MBps)"
-                axs[1,0].set_title(disk_title, color='white')
+                axs[1,0].set_title(disk_title)  # Only update the text, not the color
                 if usage[2] and len(usage[2]) > 0:
                     disk = usage[2][selected_disk_idx % len(usage[2])]
                     disk_read = disk["readSpeed"]
@@ -176,9 +207,9 @@ def build_main_ui():
 
     # buttons for going to next disk and previous disk
     nextDiskBtn = CTkButton(root, text="Next Disk", command=next_disk)
-    nextDiskBtn.place(relx=0.33, rely=0.75)
+    nextDiskBtn.place(relx=0.3, rely=0.83)
     prevDiskBtn = CTkButton(root, text="Prev Disk", command=prev_disk)
-    prevDiskBtn.place(relx=0.15, rely=0.75)
+    prevDiskBtn.place(relx=0.12, rely=0.83)
 
     update_bars_threaded()
     root.mainloop()
@@ -274,7 +305,6 @@ def build_main_ui():
             root.after(0, update_plot)
             root.after(1000, update_bars_threaded)
         threading.Thread(target=fetch_and_update, daemon=True).start()
-        
     def next_disk():
         global selected_disk_idx
         usage = get_usage()

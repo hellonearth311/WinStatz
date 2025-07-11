@@ -17,7 +17,7 @@ def open_settings(root):
     darkLightModeLabel = CTkLabel(settings_window, text="Dark/Light Mode:")
     darkLightModeLabel.place(relx=0.1, rely=0.1, anchor="w")
 
-    darkLightModeOption = CTkOptionMenu(settings_window, values=["Dark", "Light"], command=lambda x: set_appearance_mode(x))
+    darkLightModeOption = CTkOptionMenu(settings_window, values=["Dark", "Light"], command=lambda x: my_set_appearance_mode(x))
     darkLightModeOption.place(relx=0.5, rely=0.1, anchor="w")
 
     # color theme option
@@ -39,6 +39,21 @@ def set_color_theme(theme, root):
         build_main_ui()
     else:
         messagebox.showinfo("Change Theme", "Theme change cancelled.")
+
+def my_set_appearance_mode(mode):
+    """
+    Set the appearance mode of the app.
+    :param mode: "Dark" or "Light"
+    """
+    from ui import update_graph_theme
+    if mode == "Dark":
+        set_appearance_mode("dark")
+        update_graph_theme("#242424", "white")
+    elif mode == "Light":
+        set_appearance_mode("light")
+        update_graph_theme("#ebebeb", "black")
+    else:
+        messagebox.showerror("Error", "Invalid appearance mode selected.")
 
 def open_3_dots_details():
     # open the window
