@@ -69,11 +69,34 @@ def update_graph_theme(bg_color, text_color="white"):
             battery_canvas.draw()
 
 def build_main_ui():
+    import os
+    import sys
+    from PIL import Image, ImageTk
+
     root = CTk()
     root.geometry("1000x1000")
     root.title("WinStatz")
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
     root.resizable(False, False)
+
+    # Set app icon
+    icon_path = os.path.join("assets", "icon.png")
+    if os.path.exists(icon_path):
+        try:
+            if sys.platform.startswith("win"):
+                ico_path = os.path.join("assets", "icon.ico")
+                if os.path.exists(ico_path):
+                    root.iconbitmap(ico_path)
+                else:
+                    img = Image.open(icon_path)
+                    icon_img = ImageTk.PhotoImage(img)
+                    root.iconphoto(True, icon_img)
+            else:
+                img = Image.open(icon_path)
+                icon_img = ImageTk.PhotoImage(img)
+                root.iconphoto(True, icon_img)
+        except Exception as e:
+            print(f"Could not set app icon: {e}")
 
     # title label
     titleLabel = CTkLabel(root, text="WinStatz", font=("Poppins", 48, "bold"))
