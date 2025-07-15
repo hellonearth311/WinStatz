@@ -1,0 +1,3 @@
+@echo off
+echo Starting WinStatz...
+start "" "%~dp0dist\WinStatz.exe"
