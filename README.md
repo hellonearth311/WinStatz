@@ -79,7 +79,7 @@ To reset your settings:
 - Windows-only application
 
 ## License
-MIT
+[MIT License](LICENSE)
 
 ## Acknowledgments
 - Built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
