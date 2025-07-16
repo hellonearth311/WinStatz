@@ -50,7 +50,7 @@ Or manually with PyInstaller
 pip install pyinstaller
 pyinstaller --onefile --windowed --icon=assets\\icon.ico --add-data "assets;assets" --name "WinStatz" src/main.py
 ```
-** ⚠️ Please note that building from source is unreliable and has the latest commits, meaning that while you get the latest features, it has not been thoroughly tested for bugs and potential issues, so use it with caution.**
+**⚠️ Please note that building from source is unreliable and has the latest commits, meaning that while you get the latest features, it has not been thoroughly tested for bugs and potential issues, so use it with caution.**
 
 ## Usage
 - **Main Dashboard**: View real-time system hardware usage
