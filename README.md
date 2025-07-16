@@ -14,7 +14,10 @@ A simple, minimalistic real-time system stats viewer for Windows.
 To reset your settings, go to   ```%LOCALAPPDATA%\WinStatz``` and delete that folder. Once you restart the app, the settings will have reset.
 
 ## Screenshots
-**screenshots here**
+![homepage](img/homepage.png)
+![advanced specs](img/advancedspecs.png)
+![settings](img/settings.png)
+![different theme](img/differenttheme.png)
 
 ## Download & Installation
 1. Download the latest `WinStatz.exe` from the releases page
