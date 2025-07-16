@@ -28,14 +28,14 @@ def open_settings(root):
     colorThemeOption.place(relx=0.5, rely=0.2, anchor="w")
 
 def set_color_theme(theme, root):
-    from ui import build_main_ui
-    
     # ask the user to confirm the app restart
     confirm = messagebox.askyesno("Change Theme", f"Do you want to change the theme to {theme.capitalize()}? The app will restart.")
 
     if confirm:
         root.destroy()
         set_default_color_theme(theme)
+        # Import here to avoid circular import
+        from ui import build_main_ui
         build_main_ui()
     else:
         messagebox.showinfo("Change Theme", "Theme change cancelled.")
@@ -45,6 +45,7 @@ def my_set_appearance_mode(mode):
     Set the appearance mode of the app.
     :param mode: "Dark" or "Light"
     """
+    # Import here to avoid circular import
     from ui import update_graph_theme
     if mode == "Dark":
         set_appearance_mode("dark")

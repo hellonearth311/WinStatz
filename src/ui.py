@@ -80,11 +80,12 @@ def build_main_ui():
     root.resizable(False, False)
 
     # Set app icon
-    icon_path = os.path.join("assets", "icon.png")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    icon_path = os.path.join(script_dir, "..", "assets", "icon.png")
     if os.path.exists(icon_path):
         try:
             if sys.platform.startswith("win"):
-                ico_path = os.path.join("assets", "icon.ico")
+                ico_path = os.path.join(script_dir, "..", "assets", "icon.ico")
                 if os.path.exists(ico_path):
                     root.iconbitmap(ico_path)
                 else:
@@ -159,188 +160,108 @@ def build_main_ui():
     # update the bar graphs
     def update_bars_threaded():
         def fetch_and_update():
-            usage = get_usage()
+            try:
+                usage = get_usage()
+                if not usage:
+                    return
+            except Exception as e:
+                print(f"Error getting usage data: {e}")
+                return
+                
             def update_plot():
-                # CPU
-                cpu_total_usage = sum(usage[0].values())
-                cpu_average_usage = round(cpu_total_usage / len(usage[0]), 1)
-                cpu_bar[0].set_height(cpu_average_usage)
-                axs[0,0].set_ylim(0, 100)
+                try:
+                    # CPU
+                    if usage[0] and len(usage[0]) > 0:
+                        cpu_total_usage = sum(usage[0].values())
+                        cpu_average_usage = round(cpu_total_usage / len(usage[0]), 1)
+                    else:
+                        cpu_average_usage = 0
+                    cpu_bar[0].set_height(cpu_average_usage)
+                    axs[0,0].set_ylim(0, 100)
 
-                # RAM
-                used_ram = usage[1]['used']
-                free_ram = usage[1]['free']
-                ram_bar[0].set_height(used_ram)
-                ram_bar[1].set_height(free_ram)
-                axs[0,1].set_ylim(0, usage[1]['total'])
+                    # RAM
+                    if usage[1]:
+                        used_ram = usage[1].get('used', 0)
+                        free_ram = usage[1].get('free', 0)
+                        total_ram = usage[1].get('total', used_ram + free_ram)
+                        ram_bar[0].set_height(used_ram)
+                        ram_bar[1].set_height(free_ram)
+                        axs[0,1].set_ylim(0, total_ram)
+                    else:
+                        ram_bar[0].set_height(0)
+                        ram_bar[1].set_height(0)
+                        axs[0,1].set_ylim(0, 100)
 
-                # Disk
-                disk_title = f"Disk {selected_disk_idx + 1} Usage (MBps)"
-                axs[1,0].set_title(disk_title)  # Only update the text, not the color
-                if usage[2] and len(usage[2]) > 0:
-                    disk = usage[2][selected_disk_idx % len(usage[2])]
-                    disk_read = disk["readSpeed"]
-                    disk_write = disk["writeSpeed"]
-                else:
-                    disk_read = 0
-                    disk_write = 0
-                disk_bar[0].set_height(disk_read)
-                disk_bar[1].set_height(disk_write)
-                axs[1,0].set_ylim(0, max(100, disk_read, disk_write))
+                    # Disk
+                    disk_title = f"Disk {selected_disk_idx + 1} Usage (MBps)"
+                    axs[1,0].set_title(disk_title)  # Only update the text, not the color
+                    if usage[2] and len(usage[2]) > 0:
+                        disk = usage[2][selected_disk_idx % len(usage[2])]
+                        disk_read = disk.get("readSpeed", 0)
+                        disk_write = disk.get("writeSpeed", 0)
+                    else:
+                        disk_read = 0
+                        disk_write = 0
+                    disk_bar[0].set_height(disk_read)
+                    disk_bar[1].set_height(disk_write)
+                    axs[1,0].set_ylim(0, max(100, disk_read, disk_write))
 
-                # Network
-                net_up = usage[3]["up"] if usage[3] else 0
-                net_down = usage[3]["down"] if usage[3] else 0
-                net_bar[0].set_height(net_up)
-                net_bar[1].set_height(net_down)
-                axs[1,1].set_ylim(0, max(100, net_up, net_down))
+                    # Network
+                    net_up = usage[3].get("up", 0) if usage[3] else 0
+                    net_down = usage[3].get("down", 0) if usage[3] else 0
+                    net_bar[0].set_height(net_up)
+                    net_bar[1].set_height(net_down)
+                    axs[1,1].set_ylim(0, max(100, net_up, net_down))
 
-                # Battery
-                battery_percent = usage[4]["percent"] if usage[4] and "percent" in usage[4] else 0
-                battery_icon.set_width(0.6 * (battery_percent / 100))
-                if battery_percent > 20:
-                    battery_icon.set_facecolor("#27ae60")  # green
-                else:
-                    battery_icon.set_facecolor("#e74c3c")  # red for low battery
-                battery_canvas.draw()
+                    # Battery
+                    battery_percent = usage[4].get("percent", 0) if usage[4] else 0
+                    battery_icon.set_width(0.6 * (battery_percent / 100))
+                    if battery_percent > 20:
+                        battery_icon.set_facecolor("#27ae60")  # green
+                    else:
+                        battery_icon.set_facecolor("#e74c3c")  # red for low battery
+                    battery_canvas.draw()
 
-                canvas.draw()
+                    canvas.draw()
+                except Exception as e:
+                    print(f"Error updating plots: {e}")
             root.after(0, update_plot)
             root.after(1000, update_bars_threaded)
         threading.Thread(target=fetch_and_update, daemon=True).start()
 
     def show_disk(idx):
         global selected_disk_idx
-        selected_disk_idx = idx
-        update_bars_threaded()
+        try:
+            selected_disk_idx = idx
+            update_bars_threaded()
+        except Exception as e:
+            print(f"Error showing disk {idx}: {e}")
 
     def next_disk():
         global selected_disk_idx
-        usage = get_usage()
-        if usage[2] and len(usage[2]) > 0:
-            selected_disk_idx = (selected_disk_idx + 1) % len(usage[2])
-        update_bars_threaded()
+        try:
+            usage = get_usage()
+            if usage and usage[2] and len(usage[2]) > 0:
+                selected_disk_idx = (selected_disk_idx + 1) % len(usage[2])
+            update_bars_threaded()
+        except Exception as e:
+            print(f"Error switching to next disk: {e}")
 
     def prev_disk():
         global selected_disk_idx
-        usage = get_usage()
-        if usage[2] and len(usage[2]) > 0:
-            selected_disk_idx = (selected_disk_idx - 1) % len(usage[2])
-        update_bars_threaded()
+        try:
+            usage = get_usage()
+            if usage and usage[2] and len(usage[2]) > 0:
+                selected_disk_idx = (selected_disk_idx - 1) % len(usage[2])
+            update_bars_threaded()
+        except Exception as e:
+            print(f"Error switching to previous disk: {e}")
 
     # buttons for going to next disk and previous disk
     nextDiskBtn = CTkButton(root, text="Next Disk", command=next_disk)
     nextDiskBtn.place(relx=0.3, rely=0.83)
     prevDiskBtn = CTkButton(root, text="Prev Disk", command=prev_disk)
     prevDiskBtn.place(relx=0.12, rely=0.83)
-
-    update_bars_threaded()
-    root.mainloop()
-
-    # style
-    plt.style.use('dark_background')
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    plt.tight_layout(pad=6.0)
-
-    # create the graphs
-    axs[0,0].set_title("CPU Usage (%)", color='white')
-    axs[0,1].set_title("RAM Usage (MB)", color='white')
-    axs[1,0].set_title(f"Disk {selected_disk_idx + 1} Usage (MBps)", color='white')
-    axs[1,1].set_title("Network Usage (Mbps)", color='white')
-
-    for ax in axs.flat:
-        ax.set_facecolor('#222222')
-        ax.tick_params(colors='white')
-        ax.yaxis.label.set_color('white')
-        ax.xaxis.label.set_color('white')
-
-    cpu_bar = axs[0,0].bar(["Avg"], [0], color="#3498db")
-    ram_bar = axs[0,1].bar(["Used", "Free"], [0,0], color=["#27ae60", "#7f8c8d"])
-    disk_bar = axs[1,0].bar(["Read", "Write"], [0,0], color=["#9b59b6", "#e67e22"])
-    net_bar = axs[1,1].bar(["Up", "Down"], [0,0], color=["#e74c3c", "#1abc9c"])
-
-    import matplotlib.patches as mpatches
-    battery_fig, battery_ax = plt.subplots(figsize=(4, 2))
-    battery_ax.set_facecolor('#222222')
-    battery_ax.axis('off')
-    battery_icon = mpatches.FancyBboxPatch((0.2, 0.4), 0.6, 0.2,
-        boxstyle="round,pad=0.05", ec="black", fc="#27ae60", mutation_aspect=2)
-    battery_ax.add_patch(battery_icon)
-    battery_tip = mpatches.FancyBboxPatch((0.82, 0.48), 0.08, 0.04,
-        boxstyle="round,pad=0.05", ec="black", fc="#27ae60", mutation_aspect=2)
-    battery_ax.add_patch(battery_tip)
-    battery_ax.set_xlim(0, 1)
-    battery_ax.set_ylim(0, 1)
-    battery_ax.text(0.5, 0.5, "Battery", color='white', fontsize=14, ha='center', va='center')
-
-    canvas = FigureCanvasTkAgg(fig, master=root)
-    canvas.get_tk_widget().place(relx=0.5, rely=0.45, anchor="center")
-    battery_canvas = FigureCanvasTkAgg(battery_fig, master=root)
-    battery_canvas.get_tk_widget().place(relx=0.5, rely=0.85, anchor="center")
-
-    # update the bar graphs
-    def update_bars_threaded():
-        def fetch_and_update():
-            usage = get_usage()
-            def update_plot():
-                # CPU
-                cpu_total_usage = sum(usage[0].values())
-                cpu_average_usage = round(cpu_total_usage / len(usage[0]), 1)
-                cpu_bar[0].set_height(cpu_average_usage)
-                axs[0,0].set_ylim(0, 100)
-
-                # RAM
-                used_ram = usage[1]['used']
-                free_ram = usage[1]['free']
-                ram_bar[0].set_height(used_ram)
-                ram_bar[1].set_height(free_ram)
-                axs[0,1].set_ylim(0, usage[1]['total'])
-
-                # Disk
-                if usage[2] and len(usage[2]) > 0:
-                    disk = usage[2][selected_disk_idx % len(usage[2])]
-                    disk_read = disk["readSpeed"]
-                    disk_write = disk["writeSpeed"]
-                else:
-                    disk_read = 0
-                    disk_write = 0
-                disk_bar[0].set_height(disk_read)
-                disk_bar[1].set_height(disk_write)
-                axs[1,0].set_ylim(0, max(100, disk_read, disk_write))
-
-                # Network
-                net_up = usage[3]["up"] if usage[3] else 0
-                net_down = usage[3]["down"] if usage[3] else 0
-                net_bar[0].set_height(net_up)
-                net_bar[1].set_height(net_down)
-                axs[1,1].set_ylim(0, max(100, net_up, net_down))
-
-                # Battery
-                battery_percent = usage[4]["percent"] if usage[4] and "percent" in usage[4] else 0
-                battery_icon.set_width(0.6 * (battery_percent / 100))
-                if battery_percent > 20:
-                    battery_icon.set_facecolor("#27ae60")  # green
-                else:
-                    battery_icon.set_facecolor("#e74c3c")  # red for low battery
-                battery_canvas.draw()
-
-                canvas.draw()
-            root.after(0, update_plot)
-            root.after(1000, update_bars_threaded)
-        threading.Thread(target=fetch_and_update, daemon=True).start()
-    def next_disk():
-        global selected_disk_idx
-        usage = get_usage()
-        if usage[2] and len(usage[2]) > 0:
-            selected_disk_idx = (selected_disk_idx + 1) % len(usage[2])
-        update_bars_threaded()
-
-    def prev_disk():
-        global selected_disk_idx
-        usage = get_usage()
-        if usage[2] and len(usage[2]) > 0:
-            selected_disk_idx = (selected_disk_idx - 1) % len(usage[2])
-        update_bars_threaded()
 
     update_bars_threaded()
     root.mainloop()

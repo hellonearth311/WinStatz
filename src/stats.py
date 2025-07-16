@@ -66,20 +66,27 @@ def get_usage():
         time.sleep(1)
         disk_counters_2 = psutil.disk_io_counters(perdisk=True)
 
-        for device in disk_counters_1:
-            read_bytes_1 = disk_counters_1[device].read_bytes
-            write_bytes_1 = disk_counters_1[device].write_bytes
-            read_bytes_2 = disk_counters_2[device].read_bytes
-            write_bytes_2 = disk_counters_2[device].write_bytes
+        if disk_counters_1 and disk_counters_2:
+            for device in disk_counters_1:
+                # Check if device still exists in second measurement
+                if device in disk_counters_2:
+                    try:
+                        read_bytes_1 = disk_counters_1[device].read_bytes
+                        write_bytes_1 = disk_counters_1[device].write_bytes
+                        read_bytes_2 = disk_counters_2[device].read_bytes
+                        write_bytes_2 = disk_counters_2[device].write_bytes
 
-            read_speed = (read_bytes_2 - read_bytes_1) / (1024 * 1024)
-            write_speed = (write_bytes_2 - write_bytes_1) / (1024 * 1024)
+                        read_speed = (read_bytes_2 - read_bytes_1) / (1024 * 1024)
+                        write_speed = (write_bytes_2 - write_bytes_1) / (1024 * 1024)
 
-            disk_usages.append({
-                "device": device,
-                "readSpeed": round(read_speed, 2),
-                "writeSpeed": round(write_speed, 2),
-            })
+                        disk_usages.append({
+                            "device": device,
+                            "readSpeed": round(read_speed, 2),
+                            "writeSpeed": round(write_speed, 2),
+                        })
+                    except (AttributeError, KeyError):
+                        # Skip this disk if we can't get proper data
+                        continue
 
         print("disk usages")
         for disk in disk_usages:
@@ -90,16 +97,22 @@ def get_usage():
     try:
         # network usage
         net1 = psutil.net_io_counters()
-        time.sleep(1)
-        net2 = psutil.net_io_counters()
+        if net1:
+            time.sleep(1)
+            net2 = psutil.net_io_counters()
+            
+            if net2:
+                upload_speed = round((net2.bytes_sent - net1.bytes_sent) / 1024 ** 2, 2)
+                download_speed = round((net2.bytes_recv - net1.bytes_recv) / 1024 ** 2, 2)
 
-        upload_speed = round((net2.bytes_sent - net1.bytes_sent) / 1024 ** 2, 2)
-        download_speed = round((net2.bytes_recv - net1.bytes_recv) / 1024 ** 2, 2)
-
-        network_usage = {
-            "up": upload_speed,
-            "down": download_speed
-        }
+                network_usage = {
+                    "up": upload_speed,
+                    "down": download_speed
+                }
+            else:
+                network_usage = None
+        else:
+            network_usage = None
 
         print("network usage")
         print(network_usage)
@@ -109,11 +122,14 @@ def get_usage():
     try:
         # battery stats
         battery = psutil.sensors_battery()
-        battery_usage = {
-            "percent": battery.percent,
-            "pluggedIn": battery.power_plugged,
-            "timeLeftMins": battery.secsleft // 60 if battery.secsleft != psutil.POWER_TIME_UNLIMITED else 2147483640
-        }
+        if battery is not None:
+            battery_usage = {
+                "percent": battery.percent,
+                "pluggedIn": battery.power_plugged,
+                "timeLeftMins": battery.secsleft // 60 if battery.secsleft != psutil.POWER_TIME_UNLIMITED else 2147483640
+            }
+        else:
+            battery_usage = None
 
         print("battery usage")
         print(battery_usage)
