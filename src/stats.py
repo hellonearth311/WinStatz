@@ -2,6 +2,16 @@ import psutil
 import wmi
 import time
 
+# Hardware specs caching to reduce WMI query frequency
+_hardware_cache = {}
+_cache_timestamp = 0
+CACHE_DURATION = 300  # 5 minutes
+
+# Persistent psutil objects to avoid recreation
+_last_cpu_call = 0
+_last_disk_counters = None
+_last_net_counters = None
+
 def get_usage():
     '''
     Get real-time usage data for most system components. \n
@@ -30,10 +40,15 @@ def get_usage():
         { "percent": percent_left, "pluggedIn": is_plugged_in, "timeLeftMins": minutes_left (2147483640 = unlimited) }\n
     ''' 
     try:
-        # cpu usage
-        psutil.cpu_percent(percpu=True)
-        time.sleep(0.1)
-        cpu_usage_list = psutil.cpu_percent(percpu=True)
+        # cpu usage - use interval=None for non-blocking call after initial call
+        global _last_cpu_call
+        if _last_cpu_call == 0:
+            # First call needs to be blocking to initialize
+            psutil.cpu_percent(percpu=True)
+            time.sleep(0.1)
+            _last_cpu_call = time.time()
+        
+        cpu_usage_list = psutil.cpu_percent(percpu=True, interval=None)
 
         cpu_usage = {}
         for i, core in enumerate(cpu_usage_list, 1):
@@ -60,33 +75,37 @@ def get_usage():
         ram_usage = None
 
     try:
-        # disk usage
+        # disk usage - use persistent counters for better performance
+        global _last_disk_counters
         disk_usages = []
-        disk_counters_1 = psutil.disk_io_counters(perdisk=True)
-        time.sleep(1)
-        disk_counters_2 = psutil.disk_io_counters(perdisk=True)
+        
+        disk_counters_1 = _last_disk_counters if _last_disk_counters else psutil.disk_io_counters(perdisk=True)
+        if disk_counters_1:
+            time.sleep(1)
+            disk_counters_2 = psutil.disk_io_counters(perdisk=True)
+            _last_disk_counters = disk_counters_2  # Cache for next call
 
-        if disk_counters_1 and disk_counters_2:
-            for device in disk_counters_1:
-                # Check if device still exists in second measurement
-                if device in disk_counters_2:
-                    try:
-                        read_bytes_1 = disk_counters_1[device].read_bytes
-                        write_bytes_1 = disk_counters_1[device].write_bytes
-                        read_bytes_2 = disk_counters_2[device].read_bytes
-                        write_bytes_2 = disk_counters_2[device].write_bytes
+            if disk_counters_2:
+                for device in disk_counters_1:
+                    # Check if device still exists in second measurement
+                    if device in disk_counters_2:
+                        try:
+                            read_bytes_1 = disk_counters_1[device].read_bytes
+                            write_bytes_1 = disk_counters_1[device].write_bytes
+                            read_bytes_2 = disk_counters_2[device].read_bytes
+                            write_bytes_2 = disk_counters_2[device].write_bytes
 
-                        read_speed = (read_bytes_2 - read_bytes_1) / (1024 * 1024)
-                        write_speed = (write_bytes_2 - write_bytes_1) / (1024 * 1024)
+                            read_speed = (read_bytes_2 - read_bytes_1) / (1024 * 1024)
+                            write_speed = (write_bytes_2 - write_bytes_1) / (1024 * 1024)
 
-                        disk_usages.append({
-                            "device": device,
-                            "readSpeed": round(read_speed, 2),
-                            "writeSpeed": round(write_speed, 2),
-                        })
-                    except (AttributeError, KeyError):
-                        # Skip this disk if we can't get proper data
-                        continue
+                            disk_usages.append({
+                                "device": device,
+                                "readSpeed": round(read_speed, 2),
+                                "writeSpeed": round(write_speed, 2),
+                            })
+                        except (AttributeError, KeyError):
+                            # Skip this disk if we can't get proper data
+                            continue
 
         print("disk usages")
         for disk in disk_usages:
@@ -95,11 +114,13 @@ def get_usage():
         disk_usages = None
 
     try:
-        # network usage
-        net1 = psutil.net_io_counters()
+        # network usage - use persistent counters for better performance
+        global _last_net_counters
+        net1 = _last_net_counters if _last_net_counters else psutil.net_io_counters()
         if net1:
             time.sleep(1)
             net2 = psutil.net_io_counters()
+            _last_net_counters = net2  # Cache for next call
             
             if net2:
                 upload_speed = round((net2.bytes_sent - net1.bytes_sent) / 1024 ** 2, 2)
@@ -189,6 +210,12 @@ def get_specs():
     * If anything returns None, it means it could not be found.\n
     * For the GPU, RAM, Storage, and Network Adapters, it will return a list with all of your hardware of that category.\n
     '''
+    global _hardware_cache, _cache_timestamp
+    current_time = time.time()
+    
+    # Return cached data if still valid
+    if current_time - _cache_timestamp < CACHE_DURATION and _hardware_cache:
+        return _hardware_cache
     # main system component
     c = wmi.WMI()
 
@@ -317,7 +344,13 @@ def get_specs():
         battery_data = None
 
     # return everything
-    return [cpu_data, gpu_data_list, ram_data_list, storage_data_list, network_data, battery_data]
+    specs = [cpu_data, gpu_data_list, ram_data_list, storage_data_list, network_data, battery_data]
+    
+    # Update cache
+    _hardware_cache = specs
+    _cache_timestamp = current_time
+    
+    return specs
 
 if __name__ == "__main__":
     get_specs()
